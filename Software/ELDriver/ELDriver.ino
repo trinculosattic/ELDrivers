@@ -1,6 +1,5 @@
 #include "Tlc5940.h"
 #include <avr/wdt.h>
-#include <EEPROM.h>
 
 int x;
 
@@ -29,22 +28,18 @@ void setup()
 
   delay(1000);  // 1000ms to stabilize voltage
 
-  if(EEPROM.read(0) == 0x55 || EEPROM.read(0) == 0x55) // We've been programmed, but read twice to be sure.
+  pinMode(12,INPUT_PULLUP);
+
+  if(digitalRead(12) == LOW)
   {
-    mode = EEPROM.read(1);
-    if(mode > 2)
-    {
-      mode = 0; 
-    }
+     mode = 1; 
   }
-  else  // We've never been programmed
+  else
   {
-    EEPROM.write(1,mode);
-    EEPROM.write(0,0x55);    
+     mode = 0;
   }
-
-
-
+ 
+  
   Tlc.init();
   Serial.begin(250000);
   pinMode(A0,INPUT_PULLUP);
@@ -99,40 +94,19 @@ void setup()
   pinMode(2,OUTPUT);
   digitalWrite(2,LOW);
   wdt_reset(); // Reset the WDT
+  Tlc.clear();
   wdt_enable(WDTO_120MS); // Enable WDT at 120ms -- arduino will reset within 120ms of a lockup
 }
 
 void loop()
 {
   wdt_reset(); // Must call every 120ms at most.
-  if(dmx_address == 0)
+ if(dmx_address == 0)
   {
 
   }
   else if(dmx_address == 511)
   {
-    wdt_disable(); // we're going to be stuck in some loops, so disable.
-
-
-    while(digitalRead(7) == HIGH)
-    {
-      if(digitalRead(A0) == LOW && digitalRead(A1) == HIGH)
-      {
-        mode = 1; 
-      }
-      if(digitalRead(A1) == LOW && digitalRead(A0) == LOW)
-      {
-        mode = 2;
-      }
-    }
-
-    EEPROM.write(1,mode);
-  
-    for(;;)
-    {
-       // Do nothing! 
-    }
-
 
   }
   else
@@ -170,7 +144,7 @@ void loop()
         for(x = 0; x < 16; x++)
         {
           level = map(DMXget(dmx_address+x*2), 0, 255, 0, 4095);
-          strobe[x] = map(DMXget(dmx_address+1+x*2), 0, 255, 500, 100);
+          strobe[x] = map(DMXget(dmx_address+1+x*2), 0, 255, 200, 20);
           if(DMXget(dmx_address+1+x*2) == 0)
           {
             strobe[x] = 0; 
@@ -201,6 +175,12 @@ void loop()
             need_update = 1;
           } 
         }
+        else if(timers[x] + 50 < millis() && strobe[x] > 0)
+        {
+            Tlc.set(x,0);
+            need_update = 1;
+     
+        }
       }
 
       if(need_update == 1)
@@ -213,7 +193,15 @@ void loop()
 
 
   }
-
+  
+    if(digitalRead(12) == LOW)
+  {
+     mode = 1; 
+  }
+  else
+  {
+     mode = 0;
+  }
 }
 
 
